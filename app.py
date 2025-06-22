@@ -69,14 +69,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'charset': 'utf8mb4',
         'autocommit': True,       # تجنب transactions غير الضرورية
         'use_unicode': True,
-        'client_flag': CLIENT.MULTI_STATEMENTS,
-        'init_command': """
-            SET SESSION sql_mode='NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO';
-            SET SESSION innodb_lock_wait_timeout=5;
-            SET SESSION lock_wait_timeout=5;
-            SET SESSION wait_timeout=300;
-            SET SESSION interactive_timeout=300;
-        """
+        'init_command': "SET SESSION sql_mode='NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'"
     }
 }
 
