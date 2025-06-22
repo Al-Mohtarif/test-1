@@ -46,8 +46,8 @@ app.config['SESSION_COOKIE_SECURE'] = True
 
 # إعداد الاتصال بقاعدة البيانات
 #OkeSz2oNI7id
-#app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://almohtarif_company:OkeSz2oNI7id@37.60.250.83:3306/almohtarif_company_db_2"
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:BxBGpPHRfbjabbKzkVRuhivONYSVJbjS@nozomi.proxy.rlwy.net:34526/railway"
+app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://almohtarif_company:OkeSz2oNI7id@37.60.250.83:3306/almohtarif_company_db_2"
+#app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:BxBGpPHRfbjabbKzkVRuhivONYSVJbjS@nozomi.proxy.rlwy.net:34526/railway"
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 10,
     'pool_recycle': 3600,
