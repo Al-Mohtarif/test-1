@@ -164,7 +164,7 @@ class EvaluationCriteria(db.Model):
     value = db.Column(db.Integer, nullable=False) # وقت إجراء المشرف
 TELEGRAM_BOT_TOKEN = "7717771584:AAESm-rwUEcNTIbntV9UV6Ox0VtCjUhiDPE"
 # معرف مجموعة المشرفين - يجب الحصول عليه من البوت
-SUPERVISORS_GROUP_CHAT_ID = "7157953097"  # ضع هنا معرف المجموعة
+SUPERVISORS_GROUP_CHAT_ID = "YOUR_GROUP_CHAT_ID"  # ضع هنا معرف المجموعة
 
 # تابع لإرسال الإشعارات لمجموعة المشرفين
 def send_notifications_to_supervisors_group(evaluations):
@@ -303,6 +303,110 @@ def get_chat_id():
         
     except Exception as e:
         return jsonify({"error": str(e)})
+
+# دالة فحص حالة البوت والمشاكل
+@app.route('/check-bot-status', methods=['GET'])
+def check_bot_status():
+    """
+    فحص شامل لحالة البوت والمشاكل المحتملة
+    """
+    results = {}
+    
+    try:
+        # 1. فحص صحة التوكن
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
+        response = requests.get(url)
+        bot_info = response.json()
+        
+        if bot_info.get('ok'):
+            results['bot_status'] = '✅ البوت يعمل'
+            results['bot_info'] = {
+                'name': bot_info['result'].get('username'),
+                'id': bot_info['result'].get('id')
+            }
+        else:
+            results['bot_status'] = '❌ مشكلة في التوكن'
+            results['error'] = bot_info
+            
+    except Exception as e:
+        results['bot_status'] = f'❌ خطأ في الاتصال: {str(e)}'
+    
+    try:
+        # 2. فحص حالة الـ webhook
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getWebhookInfo"
+        response = requests.get(url)
+        webhook_info = response.json()
+        
+        if webhook_info.get('ok'):
+            webhook_data = webhook_info['result']
+            results['webhook_status'] = {
+                'url': webhook_data.get('url', 'غير محدد'),
+                'has_custom_certificate': webhook_data.get('has_custom_certificate', False),
+                'pending_update_count': webhook_data.get('pending_update_count', 0),
+                'last_error_date': webhook_data.get('last_error_date'),
+                'last_error_message': webhook_data.get('last_error_message'),
+                'max_connections': webhook_data.get('max_connections', 40)
+            }
+            
+            if webhook_data.get('url'):
+                results['webhook_status']['status'] = '✅ Webhook مفعل'
+            else:
+                results['webhook_status']['status'] = '⚠️ Webhook غير مفعل'
+        else:
+            results['webhook_status'] = '❌ خطأ في فحص الـ webhook'
+            
+    except Exception as e:
+        results['webhook_status'] = f'❌ خطأ في فحص الـ webhook: {str(e)}'
+    
+    try:
+        # 3. فحص آخر الرسائل
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+        response = requests.get(url)
+        updates = response.json()
+        
+        if updates.get('ok'):
+            recent_messages = []
+            for update in updates['result'][-5:]:  # آخر 5 رسائل
+                if 'message' in update:
+                    msg = update['message']
+                    recent_messages.append({
+                        'chat_id': msg['chat']['id'],
+                        'chat_type': msg['chat']['type'],
+                        'text': msg.get('text', 'غير نصي'),
+                        'date': msg.get('date')
+                    })
+            
+            results['recent_messages'] = recent_messages
+            results['total_updates'] = len(updates['result'])
+        else:
+            results['recent_messages'] = '❌ خطأ في جلب الرسائل'
+            
+    except Exception as e:
+        results['recent_messages'] = f'❌ خطأ: {str(e)}'
+    
+    # 4. فحص متغير المجموعة
+    results['group_chat_id'] = SUPERVISORS_GROUP_CHAT_ID
+    results['group_configured'] = SUPERVISORS_GROUP_CHAT_ID != "YOUR_GROUP_CHAT_ID"
+    
+    return jsonify(results)
+
+# دالة اختبار إرسال رسالة للمجموعة
+@app.route('/test-send-message', methods=['GET'])
+def test_send_message():
+    """
+    اختبار إرسال رسالة تجريبية للمجموعة
+    """
+    if SUPERVISORS_GROUP_CHAT_ID == "YOUR_GROUP_CHAT_ID":
+        return jsonify({"error": "يجب تحديد معرف المجموعة أولاً"})
+    
+    test_message = "🔔 رسالة تجريبية من النظام"
+    
+    success = send_telegram_message(TELEGRAM_BOT_TOKEN, SUPERVISORS_GROUP_CHAT_ID, test_message)
+    
+    if success:
+        return jsonify({"status": "✅ تم إرسال الرسالة التجريبية بنجاح"})
+    else:
+        return jsonify({"status": "❌ فشل في إرسال الرسالة التجريبية"})
 @app.route('/')
 def test_server():
     return 'Server is running! ✅'
