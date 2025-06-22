@@ -164,7 +164,7 @@ class EvaluationCriteria(db.Model):
     value = db.Column(db.Integer, nullable=False) # وقت إجراء المشرف
 TELEGRAM_BOT_TOKEN = "7717771584:AAESm-rwUEcNTIbntV9UV6Ox0VtCjUhiDPE"
 # معرف مجموعة المشرفين - يجب الحصول عليه من البوت
-SUPERVISORS_GROUP_CHAT_ID = "YOUR_GROUP_CHAT_ID"  # ضع هنا معرف المجموعة
+SUPERVISORS_GROUP_CHAT_ID = "7157953097"  # ضع هنا معرف المجموعة
 
 # تابع لإرسال الإشعارات لمجموعة المشرفين
 def send_notifications_to_supervisors_group(evaluations):
