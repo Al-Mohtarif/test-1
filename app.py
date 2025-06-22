@@ -57,13 +57,18 @@ app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://almohtarif_company:OkeS
 #    }
 #}
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 20,              # عدد الاتصالات المتزامنة (حسب عدد المستخدمين المتوقعين)
-    'max_overflow': 30,           # السماح باتصالات إضافية عند الازدحام
-    'pool_timeout': 20,           # كم ثانية ينتظر قبل رفع خطأ في حال امتلاء الاتصال
-    'pool_recycle': 1800,         # إعادة تدوير الاتصال لمنع MySQL من قطعه تلقائيًا (بسبب timeout)
-    'pool_pre_ping': True,        # التأكد من أن الاتصال فعال قبل استخدامه
+    'pool_size': 10,              # قلل العدد - أكثر ليس دائماً أفضل
+    'max_overflow': 15,           # قلل هذا أيضاً
+    'pool_timeout': 10,           # قلل الانتظار - فشل سريع أفضل
+    'pool_recycle': 3600,         # زود المدة لتجنب إعادة الاتصال المتكررة
+    'pool_pre_ping': True,        # ممتاز - احتفظ بهذا
     'connect_args': {
-        'connect_timeout': 10     # تقليل وقت انتظار الاتصال لتسريع الفشل أو النجاح
+        'connect_timeout': 5,     # قلل أكثر للاتصال السريع
+        'read_timeout': 10,       # إضافة timeout للقراءة
+        'write_timeout': 10,      # إضافة timeout للكتابة
+        'charset': 'utf8mb4',     # تحديد charset مباشرة
+        'autocommit': True,       # تسريع العمليات البسيطة
+        'sql_mode': 'TRADITIONAL' # تحسين أداء MySQL
     }
 }
 
