@@ -520,47 +520,222 @@ def check_bot_status():
 @app.route('/test-success-message', methods=['GET'])
 def test_success_message():
     """
-    اختبار إرسال رسالة تجريبية لغروب النجاحات
+    اختبار إرسال رسالة إلى مجموعة النجاحات مع تشخيص مفصل للأخطاء
     """
-    if SUCCESS_GROUP_CHAT_ID == "-4756832653":
-        return jsonify({"error": "تم تكوين غروب النجاحات بنجاح"})
-    
-    test_data = {
-        'employee_name': 'محمد أحمد',
-        'client_name': 'شركة تجريبية',
-        'service_type': 'خدمة تجريبية',
-        'evaluation_type': 'تقييم تجريبي',
-        'client_consent': True,
-        'notes': 'هذه رسالة تجريبية',
-        'operations_employee': 'أحمد علي',
-        'operations_evaluation': 'ممتاز',
-        'created_at': '2025-06-22 10:30:00',
-        'image_path': None
+    results = {
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'group_id': SUCCESS_GROUP_CHAT_ID,
+        'test_message': 'تم تكوين غروب النجاحات بنجاح ✅'
     }
     
-    success = send_success_notification(test_data)
+    # فحص أولي للإعدادات
+    if not TELEGRAM_BOT_TOKEN or TELEGRAM_BOT_TOKEN == "YOUR_BOT_TOKEN":
+        return jsonify({
+            'success': False,
+            'error': 'لم يتم تكوين توكن البوت',
+            'error_code': 'TOKEN_NOT_CONFIGURED',
+            'results': results
+        })
     
-    if success:
-        return jsonify({"status": "✅ تم إرسال رسالة النجاح التجريبية بنجاح"})
-    else:
-        return jsonify({"status": "❌ فشل في إرسال رسالة النجاح التجريبية"})
-# دالة اختبار إرسال رسالة للمجموعة
-@app.route('/test-send-message', methods=['GET'])
-def test_send_message():
-    """
-    اختبار إرسال رسالة تجريبية للمجموعة
-    """
-    if SUPERVISORS_GROUP_CHAT_ID == "YOUR_GROUP_CHAT_ID":
-        return jsonify({"error": "يجب تحديد معرف المجموعة أولاً"})
+    if not SUCCESS_GROUP_CHAT_ID or SUCCESS_GROUP_CHAT_ID == "YOUR_GROUP_CHAT_ID":
+        return jsonify({
+            'success': False,
+            'error': 'لم يتم تكوين معرف مجموعة النجاحات',
+            'error_code': 'GROUP_ID_NOT_CONFIGURED',
+            'results': results
+        })
     
-    test_message = "🔔 رسالة تجريبية من النظام"
-    
-    success = send_telegram_message(TELEGRAM_BOT_TOKEN, SUPERVISORS_GROUP_CHAT_ID, test_message)
-    
-    if success:
-        return jsonify({"status": "✅ تم إرسال الرسالة التجريبية بنجاح"})
-    else:
-        return jsonify({"status": "❌ فشل في إرسال الرسالة التجريبية"})
+    try:
+        # 1. فحص صحة البوت أولاً
+        bot_check_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
+        bot_response = requests.get(bot_check_url, timeout=10)
+        bot_data = bot_response.json()
+        
+        if not bot_data.get('ok'):
+            return jsonify({
+                'success': False,
+                'error': 'البوت غير صالح أو التوكن خاطئ',
+                'error_code': 'INVALID_BOT_TOKEN',
+                'bot_error': bot_data,
+                'results': results
+            })
+        
+        results['bot_info'] = {
+            'username': bot_data['result'].get('username'),
+            'id': bot_data['result'].get('id'),
+            'name': bot_data['result'].get('first_name')
+        }
+        
+        # 2. فحص معلومات المجموعة
+        try:
+            group_check_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getChat"
+            group_response = requests.get(group_check_url, params={'chat_id': SUCCESS_GROUP_CHAT_ID}, timeout=10)
+            group_data = group_response.json()
+            
+            if group_data.get('ok'):
+                results['group_info'] = {
+                    'title': group_data['result'].get('title'),
+                    'type': group_data['result'].get('type'),
+                    'id': group_data['result'].get('id'),
+                    'member_count': group_data['result'].get('member_count', 'غير محدد')
+                }
+            else:
+                results['group_check_error'] = group_data
+                
+        except Exception as e:
+            results['group_check_error'] = str(e)
+        
+        # 3. فحص صلاحيات البوت في المجموعة
+        try:
+            member_check_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getChatMember"
+            member_response = requests.get(member_check_url, params={
+                'chat_id': SUCCESS_GROUP_CHAT_ID,
+                'user_id': bot_data['result']['id']
+            }, timeout=10)
+            member_data = member_response.json()
+            
+            if member_data.get('ok'):
+                bot_status = member_data['result'].get('status')
+                results['bot_permissions'] = {
+                    'status': bot_status,
+                    'can_send_messages': member_data['result'].get('can_send_messages', True),
+                    'can_send_media_messages': member_data['result'].get('can_send_media_messages', True),
+                    'can_send_polls': member_data['result'].get('can_send_polls', True),
+                    'can_send_other_messages': member_data['result'].get('can_send_other_messages', True)
+                }
+                
+                # فحص إذا كان البوت محظور أو مقيد
+                if bot_status in ['left', 'kicked']:
+                    return jsonify({
+                        'success': False,
+                        'error': f'البوت {bot_status} من المجموعة',
+                        'error_code': 'BOT_NOT_IN_GROUP',
+                        'suggestion': 'يرجى إضافة البوت إلى المجموعة مرة أخرى',
+                        'results': results
+                    })
+                    
+                elif bot_status == 'restricted':
+                    return jsonify({
+                        'success': False,
+                        'error': 'البوت مقيد في المجموعة',
+                        'error_code': 'BOT_RESTRICTED',
+                        'suggestion': 'يرجى إزالة القيود عن البوت',
+                        'results': results
+                    })
+                    
+            else:
+                results['permission_check_error'] = member_data
+                
+        except Exception as e:
+            results['permission_check_error'] = str(e)
+        
+        # 4. محاولة إرسال الرسالة
+        send_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        
+        message_data = {
+            'chat_id': SUCCESS_GROUP_CHAT_ID,
+            'text': results['test_message'],
+            'parse_mode': 'HTML'
+        }
+        
+        response = requests.post(send_url, json=message_data, timeout=15)
+        response_data = response.json()
+        
+        results['send_response'] = {
+            'status_code': response.status_code,
+            'response_data': response_data
+        }
+        
+        if response_data.get('ok'):
+            results['message_info'] = {
+                'message_id': response_data['result'].get('message_id'),
+                'date': response_data['result'].get('date'),
+                'chat_id': response_data['result']['chat'].get('id'),
+                'chat_title': response_data['result']['chat'].get('title')
+            }
+            
+            return jsonify({
+                'success': True,
+                'message': 'تم إرسال رسالة الاختبار بنجاح ✅',
+                'results': results
+            })
+        else:
+            # تحليل نوع الخطأ
+            error_description = response_data.get('description', 'خطأ غير محدد')
+            error_code = response_data.get('error_code', 0)
+            
+            # أخطاء شائعة وحلولها
+            error_solutions = {
+                'Bad Request: chat not found': {
+                    'arabic': 'المجموعة غير موجودة أو معرف المجموعة خاطئ',
+                    'code': 'CHAT_NOT_FOUND',
+                    'solution': 'تأكد من صحة معرف المجموعة'
+                },
+                'Forbidden: bot was kicked from the group chat': {
+                    'arabic': 'تم طرد البوت من المجموعة',
+                    'code': 'BOT_KICKED',
+                    'solution': 'أعد إضافة البوت إلى المجموعة'
+                },
+                'Forbidden: bot is not a member of the group chat': {
+                    'arabic': 'البوت ليس عضواً في المجموعة',
+                    'code': 'BOT_NOT_MEMBER',
+                    'solution': 'أضف البوت إلى المجموعة'
+                },
+                'Bad Request: not enough rights to send text messages to the chat': {
+                    'arabic': 'البوت لا يملك صلاحية إرسال رسائل في المجموعة',
+                    'code': 'INSUFFICIENT_RIGHTS',
+                    'solution': 'امنح البوت صلاحية إرسال الرسائل من إعدادات المجموعة'
+                },
+                'Forbidden: user is deactivated': {
+                    'arabic': 'حساب البوت معطل',
+                    'code': 'BOT_DEACTIVATED',
+                    'solution': 'تحقق من صحة توكن البوت'
+                }
+            }
+            
+            error_info = error_solutions.get(error_description, {
+                'arabic': error_description,
+                'code': 'UNKNOWN_ERROR',
+                'solution': 'راجع وثائق Telegram Bot API للمزيد من المعلومات'
+            })
+            
+            return jsonify({
+                'success': False,
+                'error': error_info['arabic'],
+                'error_code': error_info['code'],
+                'error_description': error_description,
+                'telegram_error_code': error_code,
+                'solution': error_info['solution'],
+                'results': results
+            })
+            
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'success': False,
+            'error': 'انتهت مهلة الاتصال',
+            'error_code': 'TIMEOUT',
+            'solution': 'تحقق من الاتصال بالإنترنت وحاول مرة أخرى',
+            'results': results
+        })
+        
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'success': False,
+            'error': f'خطأ في الاتصال: {str(e)}',
+            'error_code': 'CONNECTION_ERROR',
+            'solution': 'تحقق من الاتصال بالإنترنت',
+            'results': results
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'خطأ غير متوقع: {str(e)}',
+            'error_code': 'UNEXPECTED_ERROR',
+            'solution': 'راجع سجلات الخادم للمزيد من التفاصيل',
+            'results': results
+        })
+        
 @app.route('/')
 def test_server():
     return 'Server is running! ✅'
