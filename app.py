@@ -1796,7 +1796,7 @@ def submit_evaluation():
         db.session.commit()
         
         try:
-            send_notifications_to_supervisors([evaluation])
+            send_notifications_to_supervisors_group([evaluation])
             evaluation.notification_sent = True
             db.session.commit()
         except Exception as e:
