@@ -163,44 +163,47 @@ class EvaluationCriteria(db.Model):
     evaluation_type = db.Column(db.String, nullable=False)
     value = db.Column(db.Integer, nullable=False) # وقت إجراء المشرف
 TELEGRAM_BOT_TOKEN = "7717771584:AAESm-rwUEcNTIbntV9UV6Ox0VtCjUhiDPE"
-# تابع لإرسال الإشعارات للمشرفين
-def send_notifications_to_supervisors(evaluations):
-    supervisors = Employee.query.filter(
-        Employee.position == 'مشرف',
-        Employee.telegram_chat_id.isnot(None),
-        Employee.telegram_chat_id != ''
-    ).all()
+# معرف مجموعة المشرفين - يجب الحصول عليه من البوت
+SUPERVISORS_GROUP_CHAT_ID = "7157953097"  # ضع هنا معرف المجموعة
 
-    TELEGRAM_BOT_TOKEN = "7717771584:AAESm-rwUEcNTIbntV9UV6Ox0VtCjUhiDPE"
+# تابع لإرسال الإشعارات لمجموعة المشرفين
+def send_notifications_to_supervisors_group(evaluations):
+    """
+    إرسال إشعارات التقييمات الجديدة لمجموعة المشرفين
+    """
     for eval in evaluations:
-        message = f"📝 تقييم جديد من {eval.employee_name}"
-        for supervisor in supervisors:
-            # تحقق من صحة chat_id قبل الإرسال
-            if not supervisor.telegram_chat_id or supervisor.telegram_chat_id.strip() == "":
-                print(f"chat_id غير صالح للمشرف: {supervisor.name}")
-                continue
+        # رسالة تتضمن اسم الموظف فقط
+        message = f"📝 تقييم جديد من الموظف: {eval.employee_name}"
+        
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            data = {
+                "chat_id": SUPERVISORS_GROUP_CHAT_ID, 
+                "text": message
+            }
+            response = requests.post(url, json=data)
+            response_json = response.json()
+            
+            if response_json.get('ok'):
+                print("تم إرسال الإشعار للمجموعة بنجاح")
+            else:
+                print(f"خطأ في إرسال الإشعار للمجموعة: {response_json}")
                 
-            try:
-                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-                data = {"chat_id": supervisor.telegram_chat_id, "text": message}
-                response = requests.post(url, json=data)
-                response_json = response.json()
-                
-                if not response_json.get('ok'):
-                    print(f"خطأ في إرسال الإشعار للمشرف {supervisor.name}: {response_json}")
-            except Exception as e:
-                print(f"⚠️ خطأ: {str(e)}")
+        except Exception as e:
+            print(f"⚠️ خطأ في إرسال الإشعار: {str(e)}")
 
         # تحديث بعد الإرسال
         eval.notification_sent = True
 
     db.session.commit()
 
-#دالة للاشعارات للموظف
+# دالة مساعدة لإرسال رسائل التلغرام
 def send_telegram_message(bot_token, chat_id, message):
+    """
+    دالة عامة لإرسال رسائل التلغرام
+    """
     try:
-        # تسجيل معلومات للتصحيح
-        print(f"محاولة إرسال إلى chat_id: {chat_id}, نوع: {type(chat_id)}")
+        print(f"محاولة إرسال إلى chat_id: {chat_id}")
         
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         data = {"chat_id": chat_id, "text": message}
@@ -210,47 +213,30 @@ def send_telegram_message(bot_token, chat_id, message):
         
         print(f"استجابة التلغرام: {response_json}")
         
-        if response.status_code == 200:
-            print(f"تم إرسال الإشعار بنجاح إلى {chat_id}")
+        if response.status_code == 200 and response_json.get('ok'):
+            print(f"تم إرسال الإشعار بنجاح")
             return True
         else:
             print(f"فشل إرسال الإشعار: {response_json}")
             return False
+            
     except Exception as e:
         print(f"حدث خطأ أثناء إرسال الإشعار: {str(e)}")
         return False
+
 def create_notification_for_employee(evaluation, status):
-    if evaluation.status == 'مقبول':
-        status_text = '✅ تم قبول'
-    else:
-        status_text = '❌ تم رفض'
-
-    message = f"{status_text} التقييم الخاص بك من قبل المشرف {evaluation.supervisor_name}"
-    
-    employee = Employee.query.filter_by(name=evaluation.employee_name).first()
-    supervisor = Employee.query.filter_by(name=evaluation.supervisor_name).first() if evaluation.supervisor_name else None
-
-    notification = Notification(
-        employee_id=employee.id if employee else None,
-        supervisor_id=supervisor.id if supervisor else None,
-        evaluation_id=evaluation.id,
-        notification_type=f"تقييم {status}",
-        message=message,
-        status=False  # غير مقروء
-    )
-    
-    db.session.add(notification)
-    
-    if employee and employee.telegram_chat_id:
-        send_telegram_message(TELEGRAM_BOT_TOKEN, employee.telegram_chat_id, message)
-    else:
-        print("لا توجد بيانات Telegram لهذا الموظف.")
-
-
-
+    """
+    الدالة معطلة حالياً - لا يتم إرسال أي إشعارات للموظفين
+    """
+    print(f"تم تعطيل الإشعارات للموظف: {evaluation.employee_name}")
+    # لا يتم إنشاء أي إشعارات للموظفين في الوقت الحالي
+    pass
 
 @app.route('/telegram-webhook', methods=['POST'])
 def telegram_webhook():
+    """
+    معالج webhook للتلغرام - مبسط للمجموعة فقط
+    """
     update = request.json
     
     # التحقق من وجود رسالة والنص
@@ -258,56 +244,65 @@ def telegram_webhook():
         chat_id = update['message']['chat']['id']
         text = update['message']['text']
         
-        # معالجة أمر start
-        if text == '/start':
-            # البحث عن الموظف بناءً على chat_id
-            employee = Employee.query.filter_by(telegram_chat_id=str(chat_id)).first()
-            
-            if employee:
-                # إرسال رسالة ترحيبية
-                welcome_message = f"مرحبًا {employee.name}! تم تفعيل الإشعارات بنجاح."
-                send_telegram_message(employee.telegram_bot_token, chat_id, welcome_message)
-                
-                # البحث عن الإشعارات غير المقروءة للموظف وإرسالها
-                unread_notifications = Notification.query.filter_by(employee_id=employee.id, status=False).all()
-                
-                if unread_notifications:
-                    for notification in unread_notifications:
-                        send_telegram_message(employee.telegram_bot_token, chat_id, notification.message)
-                        # تحديث حالة الإشعار إلى مقروء إذا أردت ذلك
-                        # notification.status = True
-                    
-                    # حفظ التغييرات في قاعدة البيانات إذا تم تحديث حالة الإشعار
-                    # db.session.commit()
-                else:
-                    send_telegram_message(employee.telegram_bot_token, chat_id, "لا توجد إشعارات جديدة.")
+        # معالجة أمر start في المجموعة
+        if text == '/start' and str(chat_id) == SUPERVISORS_GROUP_CHAT_ID:
+            welcome_message = "مرحبًا! تم تفعيل إشعارات التقييمات للمجموعة بنجاح. ✅"
+            send_telegram_message(TELEGRAM_BOT_TOKEN, chat_id, welcome_message)
     
     return jsonify({"ok": True})
 
 # دالة لإعداد webhook للبوت
 def setup_telegram_webhook(bot_token, webhook_url):
+    """
+    إعداد webhook للبوت
+    """
     url = f"https://api.telegram.org/bot{bot_token}/setWebhook"
     data = {"url": webhook_url}
     response = requests.post(url, json=data)
     return response.json()
 
-# يمكنك استدعاء هذه الدالة عند بدء تشغيل التطبيق أو من نقطة نهاية مخصصة للإعداد
 @app.route('/setup-webhooks', methods=['GET'])
 def setup_all_webhooks():
-    webhook_base_url = "https://flask-points-almohtarif.onrender.com/telegram-webhook"  # قم بتغييره إلى رابط موقعك
+    """
+    إعداد webhook للمجموعة
+    """
+    webhook_base_url = "https://flask-points-almohtarif.onrender.com/telegram-webhook"
     
-    # جلب جميع الموظفين الذين لديهم توكن تلغرام
-    employees_with_telegram = Employee.query.filter(
-        Employee.telegram_bot_token.isnot(None),
-        Employee.telegram_bot_token != ''
-    ).all()
+    # إعداد webhook واحد للبوت
+    result = setup_telegram_webhook(TELEGRAM_BOT_TOKEN, webhook_base_url)
     
-    results = {}
-    for employee in employees_with_telegram:
-        result = setup_telegram_webhook(TELEGRAM_BOT_TOKEN, webhook_base_url)
-        results[employee.id] = result
-    
-    return jsonify(results)
+    return jsonify({"webhook_setup": result})
+
+# دالة مساعدة للحصول على معرف المجموعة
+@app.route('/get-chat-id', methods=['GET'])
+def get_chat_id():
+    """
+    دالة مساعدة للحصول على معرف المجموعة
+    أضف البوت للمجموعة وأرسل أي رسالة ثم استدعي هذا الرابط
+    """
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+        response = requests.get(url)
+        updates = response.json()
+        
+        chat_ids = []
+        if updates.get('ok') and updates.get('result'):
+            for update in updates['result']:
+                if 'message' in update:
+                    chat_id = update['message']['chat']['id']
+                    chat_type = update['message']['chat']['type']
+                    chat_title = update['message']['chat'].get('title', 'غير محدد')
+                    
+                    chat_ids.append({
+                        'chat_id': chat_id,
+                        'type': chat_type,
+                        'title': chat_title
+                    })
+        
+        return jsonify({"chats": chat_ids})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
 @app.route('/')
 def test_server():
     return 'Server is running! ✅'
