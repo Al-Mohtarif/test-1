@@ -57,22 +57,20 @@ app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://almohtarif_company:OkeS
 #    }
 #}
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 5,               # قلل أكثر - للسرعة القصوى
-    'max_overflow': 10,           # حد أدنى للاتصالات الإضافية
-    'pool_timeout': 5,            # فشل فوري تقريباً
-    'pool_recycle': 7200,         # ساعتين - تجنب إعادة الاتصال
-    'pool_pre_ping': True,        # ضروري للاستقرار
+    'pool_size': 10,              # قلل العدد - أكثر ليس دائماً أفضل
+    'max_overflow': 15,           # قلل هذا أيضاً
+    'pool_timeout': 10,           # قلل الانتظار - فشل سريع أفضل
+    'pool_recycle': 3600,         # زود المدة لتجنب إعادة الاتصال المتكررة
+    'pool_pre_ping': True,        # ممتاز - احتفظ بهذا
     'connect_args': {
-        'connect_timeout': 3,     # اتصال سريع جداً أو فشل
-        'read_timeout': 5,        # قراءة سريعة
-        'write_timeout': 5,       # كتابة سريعة
-        'charset': 'utf8mb4',
-        'autocommit': True,       # تجنب transactions غير الضرورية
-        'use_unicode': True,
-        'init_command': "SET SESSION sql_mode='NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'"
+        'connect_timeout': 5,     # قلل أكثر للاتصال السريع
+        'read_timeout': 10,       # إضافة timeout للقراءة
+        'write_timeout': 10,      # إضافة timeout للكتابة
+        'charset': 'utf8mb4',     # تحديد charset مباشرة
+        'autocommit': True,       # تسريع العمليات البسيطة
+        'sql_mode': 'TRADITIONAL' # تحسين أداء MySQL
     }
 }
-
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads', 'images')
