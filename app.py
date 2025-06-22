@@ -165,7 +165,73 @@ class EvaluationCriteria(db.Model):
 TELEGRAM_BOT_TOKEN = "7717771584:AAESm-rwUEcNTIbntV9UV6Ox0VtCjUhiDPE"
 # معرف مجموعة المشرفين - يجب الحصول عليه من البوت
 SUPERVISORS_GROUP_CHAT_ID = "-4714827820"  # ضع هنا معرف المجموعة
+SUCCESS_GROUP_CHAT_ID = "-4756832653"  # غروب نجاحات Points
 
+
+# دالة إرسال تفاصيل النجاحات للغروب المخصص
+def send_success_notification(evaluation_data):
+    """
+    إرسال تفاصيل التقييم المقبول لغروب النجاحات
+    """
+    try:
+        # تنسيق الرسالة بالتيمبليت المطلوب
+        message = f"""🏆 تجربة ناجحة جديدة
+
+التفاصيل الكاملة للطلب:
+
+👤 اسم الموظف: {evaluation_data.get('employee_name', 'غير محدد')}
+🏢 اسم العميل: {evaluation_data.get('client_name', 'غير محدد')}
+⚙️ نوع الخدمة: {evaluation_data.get('service_type', 'غير محدد')}
+📋 نوع التقييم: {evaluation_data.get('evaluation_type', 'غير محدد')}
+✅ موافقة العميل: {'نعم' if evaluation_data.get('client_consent') else 'لا'}
+📝 ملاحظات: {evaluation_data.get('notes', 'لا يوجد')}
+👨‍💼 موظف العمليات: {evaluation_data.get('operations_employee', 'غير محدد')}
+⭐ تقييم العمليات: {evaluation_data.get('operations_evaluation', 'لا يوجد')}
+📅 تاريخ الإنشاء: {evaluation_data.get('created_at', 'غير محدد')}
+
+تم اعتماد هذا النجاح من قبل المشرف 🎉"""
+
+        # إرسال الرسالة النصية أولاً
+        text_sent = send_telegram_message(TELEGRAM_BOT_TOKEN, SUCCESS_GROUP_CHAT_ID, message)
+        
+        # إرسال الصورة إذا كانت موجودة
+        if evaluation_data.get('image_path') and text_sent:
+            send_telegram_photo(TELEGRAM_BOT_TOKEN, SUCCESS_GROUP_CHAT_ID, 
+                              evaluation_data['image_path'], "صورة التقييم المعتمد 📸")
+        
+        print("✅ تم إرسال تفاصيل النجاح بنجاح")
+        return True
+        
+    except Exception as e:
+        print(f"❌ خطأ في إرسال تفاصيل النجاح: {str(e)}")
+        return False
+
+# دالة إرسال الصور
+def send_telegram_photo(bot_token, chat_id, photo_url, caption=""):
+    """
+    إرسال صورة عبر التلغرام
+    """
+    try:
+        url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+        data = {
+            "chat_id": chat_id,
+            "photo": photo_url,
+            "caption": caption
+        }
+        
+        response = requests.post(url, json=data)
+        response_json = response.json()
+        
+        if response.status_code == 200 and response_json.get('ok'):
+            print("✅ تم إرسال الصورة بنجاح")
+            return True
+        else:
+            print(f"❌ فشل إرسال الصورة: {response_json}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ خطأ في إرسال الصورة: {str(e)}")
+        return False
 # تابع لإرسال الإشعارات لمجموعة المشرفين
 def send_notifications_to_supervisors_group(evaluations):
     """
@@ -304,37 +370,44 @@ def get_chat_id():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-# دالة فحص حالة البوت والمشاكل
 @app.route('/check-bot-status', methods=['GET'])
 def check_bot_status():
     """
     فحص شامل لحالة البوت والمشاكل المحتملة
+    Comprehensive bot status and issues check
     """
     results = {}
     
     try:
-        # 1. فحص صحة التوكن
+        # 1. فحص صحة التوكن (Bot Token Validation)
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         bot_info = response.json()
         
         if bot_info.get('ok'):
             results['bot_status'] = '✅ البوت يعمل'
             results['bot_info'] = {
                 'name': bot_info['result'].get('username'),
-                'id': bot_info['result'].get('id')
+                'id': bot_info['result'].get('id'),
+                'first_name': bot_info['result'].get('first_name'),
+                'can_join_groups': bot_info['result'].get('can_join_groups'),
+                'can_read_all_group_messages': bot_info['result'].get('can_read_all_group_messages')
             }
         else:
             results['bot_status'] = '❌ مشكلة في التوكن'
             results['error'] = bot_info
             
-    except Exception as e:
+    except requests.exceptions.Timeout:
+        results['bot_status'] = '❌ انتهت مهلة الاتصال'
+    except requests.exceptions.RequestException as e:
         results['bot_status'] = f'❌ خطأ في الاتصال: {str(e)}'
+    except Exception as e:
+        results['bot_status'] = f'❌ خطأ غير متوقع: {str(e)}'
     
     try:
-        # 2. فحص حالة الـ webhook
+        # 2. فحص حالة الـ webhook (Webhook Status Check)
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getWebhookInfo"
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         webhook_info = response.json()
         
         if webhook_info.get('ok'):
@@ -345,13 +418,17 @@ def check_bot_status():
                 'pending_update_count': webhook_data.get('pending_update_count', 0),
                 'last_error_date': webhook_data.get('last_error_date'),
                 'last_error_message': webhook_data.get('last_error_message'),
-                'max_connections': webhook_data.get('max_connections', 40)
+                'max_connections': webhook_data.get('max_connections', 40),
+                'allowed_updates': webhook_data.get('allowed_updates', [])
             }
             
             if webhook_data.get('url'):
                 results['webhook_status']['status'] = '✅ Webhook مفعل'
+                # فحص إضافي للـ webhook URL
+                if webhook_data.get('pending_update_count', 0) > 0:
+                    results['webhook_status']['warning'] = f'⚠️ يوجد {webhook_data["pending_update_count"]} رسالة معلقة'
             else:
-                results['webhook_status']['status'] = '⚠️ Webhook غير مفعل'
+                results['webhook_status']['status'] = '⚠️ Webhook غير مفعل - يستخدم polling'
         else:
             results['webhook_status'] = '❌ خطأ في فحص الـ webhook'
             
@@ -359,9 +436,9 @@ def check_bot_status():
         results['webhook_status'] = f'❌ خطأ في فحص الـ webhook: {str(e)}'
     
     try:
-        # 3. فحص آخر الرسائل
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-        response = requests.get(url)
+        # 3. فحص آخر الرسائل (Recent Messages Check)
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?limit=5"
+        response = requests.get(url, timeout=10)
         updates = response.json()
         
         if updates.get('ok'):
@@ -370,26 +447,103 @@ def check_bot_status():
                 if 'message' in update:
                     msg = update['message']
                     recent_messages.append({
+                        'update_id': update.get('update_id'),
                         'chat_id': msg['chat']['id'],
                         'chat_type': msg['chat']['type'],
-                        'text': msg.get('text', 'غير نصي'),
-                        'date': msg.get('date')
+                        'chat_title': msg['chat'].get('title', 'محادثة خاصة'),
+                        'from_user': msg.get('from', {}).get('username', 'غير محدد'),
+                        'text': msg.get('text', msg.get('caption', 'غير نصي'))[:100],  # أول 100 حرف
+                        'date': msg.get('date'),
+                        'message_id': msg.get('message_id')
                     })
             
             results['recent_messages'] = recent_messages
             results['total_updates'] = len(updates['result'])
+            results['messages_status'] = '✅ تم جلب الرسائل بنجاح'
         else:
-            results['recent_messages'] = '❌ خطأ في جلب الرسائل'
+            results['recent_messages'] = []
+            results['messages_status'] = '❌ خطأ في جلب الرسائل'
+            results['messages_error'] = updates
             
     except Exception as e:
-        results['recent_messages'] = f'❌ خطأ: {str(e)}'
+        results['recent_messages'] = []
+        results['messages_status'] = f'❌ خطأ: {str(e)}'
     
-    # 4. فحص متغير المجموعة
-    results['group_chat_id'] = SUPERVISORS_GROUP_CHAT_ID
-    results['group_configured'] = SUPERVISORS_GROUP_CHAT_ID != "YOUR_GROUP_CHAT_ID"
+    # 4. فحص إعدادات المجموعات (Group Configuration Check)
+    results['group_configuration'] = {
+        'supervisors_group_id': SUPERVISORS_GROUP_CHAT_ID,
+        'success_group_id': SUCCESS_GROUP_CHAT_ID,
+        'supervisors_configured': SUPERVISORS_GROUP_CHAT_ID not in ["YOUR_GROUP_CHAT_ID", "", None],
+        'success_configured': SUCCESS_GROUP_CHAT_ID not in ["YOUR_GROUP_CHAT_ID", "", None],
+        'groups_status': '✅ المجموعات مكونة' if (
+            SUPERVISORS_GROUP_CHAT_ID not in ["YOUR_GROUP_CHAT_ID", "", None] and 
+            SUCCESS_GROUP_CHAT_ID not in ["YOUR_GROUP_CHAT_ID", "", None]
+        ) else '⚠️ يرجى تكوين معرفات المجموعات'
+    }
+    
+    # 5. فحص متغيرات البيئة المهمة (Environment Variables Check)
+    results['environment_check'] = {
+        'bot_token_set': bool(TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_TOKEN != "YOUR_BOT_TOKEN"),
+        'token_format_valid': bool(TELEGRAM_BOT_TOKEN and ':' in str(TELEGRAM_BOT_TOKEN)),
+        'groups_configured': bool(
+            SUPERVISORS_GROUP_CHAT_ID not in ["YOUR_GROUP_CHAT_ID", "", None] and
+            SUCCESS_GROUP_CHAT_ID not in ["YOUR_GROUP_CHAT_ID", "", None]
+        )
+    }
+    
+    # 6. إضافة ملخص عام للحالة (Overall Status Summary)
+    all_checks = [
+        results.get('bot_status', '').startswith('✅'),
+        results.get('webhook_status', {}).get('status', '').startswith('✅') or 
+        results.get('webhook_status', {}).get('status', '').startswith('⚠️'),
+        results.get('messages_status', '').startswith('✅'),
+        results.get('group_configuration', {}).get('groups_status', '').startswith('✅')
+    ]
+    
+    if all(all_checks):
+        results['overall_status'] = '✅ جميع الفحوصات نجحت'
+        results['status_color'] = 'success'
+    elif any(all_checks):
+        results['overall_status'] = '⚠️ بعض المشاكل الطفيفة'
+        results['status_color'] = 'warning'
+    else:
+        results['overall_status'] = '❌ مشاكل خطيرة تحتاج إصلاح'
+        results['status_color'] = 'danger'
+    
+    # 7. إضافة طابع زمني للفحص
+    from datetime import datetime
+    results['check_timestamp'] = datetime.now().isoformat()
+    results['check_time_readable'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     return jsonify(results)
-
+# دالة اختبار إرسال رسالة لغروب النجاحات
+@app.route('/test-success-message', methods=['GET'])
+def test_success_message():
+    """
+    اختبار إرسال رسالة تجريبية لغروب النجاحات
+    """
+    if SUCCESS_GROUP_CHAT_ID == "-4756832653":
+        return jsonify({"error": "تم تكوين غروب النجاحات بنجاح"})
+    
+    test_data = {
+        'employee_name': 'محمد أحمد',
+        'client_name': 'شركة تجريبية',
+        'service_type': 'خدمة تجريبية',
+        'evaluation_type': 'تقييم تجريبي',
+        'client_consent': True,
+        'notes': 'هذه رسالة تجريبية',
+        'operations_employee': 'أحمد علي',
+        'operations_evaluation': 'ممتاز',
+        'created_at': '2025-06-22 10:30:00',
+        'image_path': None
+    }
+    
+    success = send_success_notification(test_data)
+    
+    if success:
+        return jsonify({"status": "✅ تم إرسال رسالة النجاح التجريبية بنجاح"})
+    else:
+        return jsonify({"status": "❌ فشل في إرسال رسالة النجاح التجريبية"})
 # دالة اختبار إرسال رسالة للمجموعة
 @app.route('/test-send-message', methods=['GET'])
 def test_send_message():
@@ -1813,47 +1967,71 @@ def update_evaluation_status(id):
     try:
         if 'user_id' not in session:
             return jsonify({"message": "يجب تسجيل الدخول أولاً"}), 401
-
         data = request.get_json()
         status = data.get('status')
         supervisor_note = data.get('supervisor_note', '')
         supervisor_name = data.get('supervisor_name', '')
         timestamp = data.get('timestamp')  # استلام الوقت المحلي من العميل
         print(f"الوقت المستلم من العميل: {timestamp}")  # طباعة الوقت المستلم للاختبار
-
+        
         if status not in ['مقبول', 'مرفوض']:
             return jsonify({"message": "حالة غير صالحة. يجب أن تكون 'مقبول' أو 'مرفوض'"}), 400
-
+        
         evaluation = db.session.get(Evaluation, id)
         if not evaluation:
             return jsonify({"message": "التقييم غير موجود"}), 404
-
+        
         # تحديث الحقول
         evaluation.status = status
         evaluation.supervisor_note = supervisor_note
         evaluation.supervisor_name = supervisor_name
-
+        
         # استخدام الوقت المحلي الذي أرسله العميل بدلاً من الوقت الحالي
         if timestamp:
             evaluation.supervisor_action_time = parse_timestamp(timestamp)  # معالجة الوقت هنا
         else:
             evaluation.supervisor_action_time = datetime.utcnow()  # إذا لم يكن هناك وقت مرسل، استخدم الوقت الحالي UTC
-
+        
         # إذا كانت الحالة "مقبول"، حساب النقاط بناءً على نوع التقييم
         if status == "مقبول":
             # استرجاع المعايير التي تتعلق بهذا النوع من التقييم
             criteria = get_evaluation_criteria(evaluation.evaluation_type)
             total_points = sum([criterion.value for criterion in criteria])  # حساب مجموع النقاط بناءً على المعايير
-
             # تحديث النقاط للتقييم
             evaluation.points = total_points
-
             # تحديث النقاط الإجمالية للموظف
             employee = Employee.query.filter_by(name=evaluation.employee_name).first()
             if employee:
                 employee.points += total_points  # إضافة النقاط للتقييم إلى النقاط الإجمالية
+            
+            # ========== إضافة الكود الجديد هنا ==========
+            # إرسال تفاصيل النجاح لغروب النجاحات
+            evaluation_data = {
+                'employee_name': evaluation.employee_name,
+                'client_name': evaluation.client_name,
+                'service_type': evaluation.service_type,
+                'evaluation_type': evaluation.evaluation_type,
+                'client_consent': evaluation.client_consent,
+                'notes': evaluation.notes,
+                'operations_employee': evaluation.operations_employee,
+                'operations_evaluation': evaluation.operations_evaluation,
+                'created_at': evaluation.created_at.strftime('%Y-%m-%d %H:%M:%S') if evaluation.created_at else 'غير محدد',
+                'image_path': evaluation.image_path,
+                'supervisor_note': supervisor_note,
+                'points': total_points
+            }
+            
+            # إرسال تفاصيل النجاح لغروب النجاحات
+            send_success_notification(evaluation_data)
+            # ========== نهاية الكود الجديد ==========
+        
+        # في حالة الرفض - لا يتم إرسال أي إشعارات
+        elif status == "مرفوض":
+            pass  # لا نفعل شيء في حالة الرفض
+        
         create_notification_for_employee(evaluation, status)
         db.session.commit()
+        
         return jsonify({
             "message": "تم تحديث التقييم بنجاح",
             "data": {
@@ -1864,7 +2042,7 @@ def update_evaluation_status(id):
                 "points": evaluation.points  # إضافة النقاط المحدثة في الاستجابة
             }
         }), 200
-
+        
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error updating evaluation: {str(e)}")
