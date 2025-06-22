@@ -48,14 +48,25 @@ app.config['SESSION_COOKIE_SECURE'] = True
 #OkeSz2oNI7id
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://almohtarif_company:OkeSz2oNI7id@37.60.250.83:3306/almohtarif_company_db_2"
 #app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:BxBGpPHRfbjabbKzkVRuhivONYSVJbjS@nozomi.proxy.rlwy.net:34526/railway"
+#app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+#    'pool_size': 10,
+#    'pool_recycle': 3600,
+#    'pool_pre_ping': True,
+#    'connect_args': {
+#        'connect_timeout': 30
+#    }
+#}
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 10,
-    'pool_recycle': 3600,
-    'pool_pre_ping': True,
+    'pool_size': 20,              # عدد الاتصالات المتزامنة (حسب عدد المستخدمين المتوقعين)
+    'max_overflow': 30,           # السماح باتصالات إضافية عند الازدحام
+    'pool_timeout': 20,           # كم ثانية ينتظر قبل رفع خطأ في حال امتلاء الاتصال
+    'pool_recycle': 1800,         # إعادة تدوير الاتصال لمنع MySQL من قطعه تلقائيًا (بسبب timeout)
+    'pool_pre_ping': True,        # التأكد من أن الاتصال فعال قبل استخدامه
     'connect_args': {
-        'connect_timeout': 30
+        'connect_timeout': 10     # تقليل وقت انتظار الاتصال لتسريع الفشل أو النجاح
     }
 }
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads', 'images')
 db = SQLAlchemy(app)
