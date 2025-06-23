@@ -131,7 +131,7 @@ class Employee(db.Model):
     position = db.Column(db.String(20), nullable=False)
     password = db.Column(db.String(255), nullable=False)
     points = db.Column(db.Integer, default=0)  # النقاط الافتراضية تكون 0
-    telegram_chat_id = db.Column(db.String(50), nullable=True) 
+    #telegram_chat_id = db.Column(db.String(50), nullable=True) 
 
 # تعريف جدول التقييمات في قاعدة البيانات
 class Evaluation(db.Model):
@@ -1602,14 +1602,14 @@ def add_employee():
             return jsonify({"error": "لم يتم استلام بيانات"}), 400
 
         position = data.get("position")
-        telegram_chat_id = data.get("telegram_chat_id") if position == "موظف" else None
+        #telegram_chat_id = data.get("telegram_chat_id") if position == "موظف" else None
         new_employee = Employee(
             name=data["name"],
             email=data["email"],
             position=position,
             department=data["department"],
             password=data["password"],
-            telegram_chat_id=telegram_chat_id
+            #telegram_chat_id=telegram_chat_id
         )
 
         db.session.add(new_employee)
@@ -1642,11 +1642,11 @@ def update_employee(id):
         if "password" in data and data["password"]:
             employee.password = data["password"]
 
-        if employee.position == "موظف":
+        #if employee.position == "موظف":
             # فقط حدّث القيمة دون التحقق من التكرار
-            new_chat_id = data.get("telegram_chat_id")
-            if new_chat_id:
-                employee.telegram_chat_id = new_chat_id
+            #new_chat_id = data.get("telegram_chat_id")
+            #if new_chat_id:
+                #employee.telegram_chat_id = new_chat_id
 
         db.session.commit()
         return jsonify({"message": "تم التحديث بنجاح", "employee_id": id})
@@ -1687,7 +1687,7 @@ def get_employees():
                 "position": emp.position,
                 "department": emp.department,
                 "password": emp.password,
-                "telegram_chat_id": emp.telegram_chat_id  # ✅ أضف هذا السطر
+                #"telegram_chat_id": emp.telegram_chat_id  # ✅ أضف هذا السطر
             })
         return jsonify(result)
     except Exception as e:
