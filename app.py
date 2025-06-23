@@ -175,14 +175,16 @@ def send_success_notification(evaluation_data):
     إرسال تفاصيل التقييم المقبول لغروب النجاحات
     """
     try:
-        print(f"🔍 Debug - client_consent: {evaluation_data.get('client_consent')}")
-        print(f"🔍 Debug - consent_link: {evaluation_data.get('consent_link')}")
         # تحضير نص رابط الموافقة
-        consent_info = ""
-        if evaluation_data.get('client_consent') == 1:  # التحقق من القيمة 1 بدلاً من True
+        if evaluation_data.get('client_consent') == 1:
             consent_link = evaluation_data.get('consent_link', '')
             if consent_link and consent_link.strip():
-                consent_info = f"\n🔗 رابط الموافقة: {consent_link}"
+                consent_display = consent_link
+            else:
+                consent_display = "لا يوجد"
+        else:
+            consent_display = "لا يوجد"
+        
         # تحضير معلومات الصورة
         image_info = ""
         if evaluation_data.get('image_path'):
@@ -199,7 +201,8 @@ def send_success_notification(evaluation_data):
 🏢 اسم العميل: {evaluation_data.get('client_name', 'غير محدد')}
 ⚙️ نوع الخدمة: {evaluation_data.get('service_type', 'غير محدد')}
 📋 نوع التقييم: {evaluation_data.get('evaluation_type', 'غير محدد')}
-✅ موافقة العميل: {'نعم' if evaluation_data.get('client_consent') else 'لا'}{consent_info}
+✅ موافقة العميل: {'نعم' if evaluation_data.get('client_consent') == 1 else 'لا'}
+🔗 رابط الموافقة: {consent_display}
 📝 ملاحظات: {evaluation_data.get('notes', 'لا يوجد')}
 👨‍💼 موظف العمليات: {evaluation_data.get('operations_employee', 'غير محدد')}
 ⭐ تقييم موظف العمليات: {evaluation_data.get('operations_evaluation', 'لا يوجد')}
