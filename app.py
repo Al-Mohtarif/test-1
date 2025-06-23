@@ -177,11 +177,10 @@ def send_success_notification(evaluation_data):
     try:
         # تحضير نص رابط الموافقة
         consent_info = ""
-        if evaluation_data.get('client_consent'):
+        if evaluation_data.get('client_consent') == 1:  # التحقق من القيمة 1 بدلاً من True
             consent_link = evaluation_data.get('consent_link', '')
             if consent_link and consent_link.strip():
                 consent_info = f"\n🔗 رابط الموافقة: {consent_link}"
-        
         # تحضير معلومات الصورة
         image_info = ""
         if evaluation_data.get('image_path'):
