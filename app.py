@@ -169,11 +169,26 @@ SUCCESS_GROUP_CHAT_ID = "-4756832653"  # غروب نجاحات Points
 
 
 # دالة إرسال تفاصيل النجاحات للغروب المخصص
+# دالة إرسال تفاصيل النجاحات للغروب المخصص
 def send_success_notification(evaluation_data):
     """
     إرسال تفاصيل التقييم المقبول لغروب النجاحات
     """
     try:
+        # تحضير نص رابط الموافقة
+        consent_info = ""
+        if evaluation_data.get('client_consent'):
+            consent_link = evaluation_data.get('consent_link', '')
+            if consent_link and consent_link.strip():
+                consent_info = f"\n🔗 رابط الموافقة: {consent_link}"
+        
+        # تحضير معلومات الصورة
+        image_info = ""
+        if evaluation_data.get('image_path'):
+            image_info = "\n📸 الصورة المرفقة: 👇"
+        else:
+            image_info = "\n📸 الصورة: لا يوجد صورة مرفقة"
+        
         # تنسيق الرسالة بالتيمبليت المطلوب
         message = f"""🏆 تجربة ناجحة جديدة
 
@@ -183,11 +198,11 @@ def send_success_notification(evaluation_data):
 🏢 اسم العميل: {evaluation_data.get('client_name', 'غير محدد')}
 ⚙️ نوع الخدمة: {evaluation_data.get('service_type', 'غير محدد')}
 📋 نوع التقييم: {evaluation_data.get('evaluation_type', 'غير محدد')}
-✅ موافقة العميل: {'نعم' if evaluation_data.get('client_consent') else 'لا'}
+✅ موافقة العميل: {'نعم' if evaluation_data.get('client_consent') else 'لا'}{consent_info}
 📝 ملاحظات: {evaluation_data.get('notes', 'لا يوجد')}
 👨‍💼 موظف العمليات: {evaluation_data.get('operations_employee', 'غير محدد')}
-⭐ تقييم العمليات: {evaluation_data.get('operations_evaluation', 'لا يوجد')}
-📅 تاريخ الإنشاء: {evaluation_data.get('created_at', 'غير محدد')}
+⭐ تقييم موظف العمليات: {evaluation_data.get('operations_evaluation', 'لا يوجد')}
+📅 تاريخ الإنشاء: {evaluation_data.get('created_at', 'غير محدد')}{image_info}
 
 تم اعتماد هذا النجاح من قبل المشرف 🎉"""
 
@@ -232,6 +247,7 @@ def send_telegram_photo(bot_token, chat_id, photo_url, caption=""):
     except Exception as e:
         print(f"❌ خطأ في إرسال الصورة: {str(e)}")
         return False
+
 # تابع لإرسال الإشعارات لمجموعة المشرفين
 def send_notifications_to_supervisors_group(evaluations):
     """
