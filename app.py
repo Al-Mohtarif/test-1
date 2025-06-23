@@ -175,6 +175,8 @@ def send_success_notification(evaluation_data):
     إرسال تفاصيل التقييم المقبول لغروب النجاحات
     """
     try:
+        print(f"🔍 Debug - client_consent: {evaluation_data.get('client_consent')}")
+        print(f"🔍 Debug - consent_link: {evaluation_data.get('consent_link')}")
         # تحضير نص رابط الموافقة
         consent_info = ""
         if evaluation_data.get('client_consent') == 1:  # التحقق من القيمة 1 بدلاً من True
