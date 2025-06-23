@@ -178,6 +178,7 @@ def send_success_notification(evaluation_data):
         # تحضير نص رابط الموافقة
         if evaluation_data.get('client_consent') == 1:
             consent_link = evaluation_data.get('consent_link', '')
+            print
             if consent_link and consent_link.strip():
                 consent_display = consent_link
             else:
@@ -2207,6 +2208,7 @@ def update_evaluation_status(id):
                 'service_type': evaluation.service_type,
                 'evaluation_type': evaluation.evaluation_type,
                 'client_consent': evaluation.client_consent,
+                'consent_k': evaluation.consent_link,
                 'notes': evaluation.notes,
                 'operations_employee': evaluation.operations_employee,
                 'operations_evaluation': evaluation.operations_evaluation,
