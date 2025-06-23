@@ -176,15 +176,30 @@ def send_success_notification(evaluation_data):
     """
     try:
         # تحضير نص رابط الموافقة
+        # طباعة جميع البيانات الواردة
+        print(f"🔍 جميع البيانات الواردة: {evaluation_data}")
+        print(f"🔍 client_consent: {evaluation_data.get('client_consent')} (نوع: {type(evaluation_data.get('client_consent'))})")
+        print(f"🔍 consent_link: {evaluation_data.get('consent_link')} (نوع: {type(evaluation_data.get('consent_link'))})")
+        
+        # تحضير نص رابط الموافقة
+        print(f"🔍 بدء معالجة رابط الموافقة...")
+        
         if evaluation_data.get('client_consent') == 1:
+            print(f"🔍 الموافقة = 1 (نعم)")
             consent_link = evaluation_data.get('consent_link', '')
-            print
+            print(f"🔍 consent_link المستخرج: '{consent_link}'")
+            
             if consent_link and consent_link.strip():
                 consent_display = consent_link
+                print(f"🔍 الرابط موجود، سيتم عرضه: {consent_display}")
             else:
                 consent_display = "لا يوجد"
+                print(f"🔍 الرابط فارغ أو None، سيتم عرض: {consent_display}")
         else:
             consent_display = "لا يوجد"
+            print(f"🔍 الموافقة = 0 (لا)، سيتم عرض: {consent_display}")
+        
+        print(f"🔍 النتيجة النهائية لرابط الموافقة: {consent_display}")
         
         # تحضير معلومات الصورة
         image_info = ""
@@ -2208,7 +2223,7 @@ def update_evaluation_status(id):
                 'service_type': evaluation.service_type,
                 'evaluation_type': evaluation.evaluation_type,
                 'client_consent': evaluation.client_consent,
-                'consent_k': evaluation.consent_link,
+                'consent_link': evaluation.consent_link,
                 'notes': evaluation.notes,
                 'operations_employee': evaluation.operations_employee,
                 'operations_evaluation': evaluation.operations_evaluation,
